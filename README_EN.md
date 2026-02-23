@@ -1,5 +1,7 @@
 # LifeLog - Automated Life Logging System
 
+[English](./README_EN.md) | [中文](./README.md)
+
 > ⚠️ **Notice**: This skill and its documentation are AI-generated. For reference only.
 
 Automatically record daily life to Notion, with intelligent date recognition and automatic summary analysis.
