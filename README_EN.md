@@ -13,6 +13,10 @@ Automatically record daily life to Notion, with intelligent date recognition and
 - 📝 **Real-time Logging** - Record life moments anytime, automatically saved to Notion
 - 🌙 **Auto Summary** - Daily automatic LLM analysis to generate emotional state, main events, locations, and people
 
+## Preview
+
+![LifeLog Preview](./assets/preview.png)
+
 ## Quick Start
 
 ### 1. Install
