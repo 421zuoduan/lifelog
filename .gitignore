@@ -1,0 +1,11 @@
+# 临时文件
+*.swp
+*.swo
+*~
+
+# 状态文件（可保留用于调试）
+# /tmp/bilibili_monitor.state
+
+# IDE
+.vscode/
+.idea/
