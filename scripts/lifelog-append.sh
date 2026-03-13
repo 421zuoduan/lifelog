@@ -1,30 +1,44 @@
 #!/bin/bash
 # LifeLog Recorder - 实时记录单条消息到 Notion（只记录日常生活）
-# 使用 LLM 智能判断日期（当关键词无法判断时）
+# 使用 OpenClaw SubAgent 智能判断日期
 
 NOTION_KEY="ntn_u6470328110RTrO6nvdJt5D3YBVYRTkbukysWQUHBGd7JD"
 DATABASE_ID="30b181a95f2e80639966c2b9d93b69cb"
 API_VERSION="2022-06-28"
+OPENCLAW_URL="http://localhost:421"
 
-# 参数：消息内容
+# 参数：消息内容 [可选：日期YYYY-MM-DD]
 CONTENT="$1"
+OPTIONAL_DATE="$2"
 
-# 简单的日期关键词解析（主要方式）
-parse_date_simple() {
+# 使用 SubAgent 判断日期
+decide_date_with_subagent() {
     local content="$1"
-    local today=$(date +%Y-%m-%d)
     
-    # 明天/明儿
-    if echo "$content" | grep -qE "明天|明日|明儿"; then
-        date -d "tomorrow" +%Y-%m-%d
-        return
-    fi
+    # 调用 OpenClaw subagent
+    local result=$(curl -s -X POST "$OPENCLAW_URL/api/sessions" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "runtime": "subagent",
+            "model": "minimax/MiniMax-M2.5",
+            "task": "你是 LifeLog 系统的日期判断专家。当前是2026年3月14日（北京时间）。根据以下用户输入的文本，判断这条记录应该属于哪一天。\n\n用户输入：'"$content"'\n\n判断规则：\n1. 如果文本中明确提到「昨天」「前天」「今天」「明天」等，使用对应的日期（昨天=2026-03-13，前天=2026-03-12，大前天=2026-03-11）\n2. 如果没有明确日期，分析上下文（比如「早上」「下午」「晚上」等时间词，结合今天正在进行的活动）\n3. 如果仍然无法判断，输出今天的日期：2026-03-14\n\n只输出日期，格式：YYYY-MM-DD，不要输出其他任何内容。",
+            "runTimeoutSeconds": 30
+        }')
     
-    # 后天
-    if echo "$content" | grep -qE "后天"; then
-        date -d "2 days" +%Y-%m-%d
-        return
+    # 解析返回的日期
+    local decided_date=$(echo "$result" | grep -oE "[0-9]{4}-[0-9]{2}-[0-9]{2}" | head -1)
+    
+    if [ -z "$decided_date" ]; then
+        echo ""
+    else
+        echo "$decided_date"
     fi
+}
+
+# 备用：简单日期解析（仅当 SubAgent 完全失败时）
+parse_date_fallback() {
+    local content="$1"
+    local today="2026-03-14"
     
     # 昨天/昨儿
     if echo "$content" | grep -qE "昨天|昨日|昨儿"; then
@@ -38,72 +52,28 @@ parse_date_simple() {
         return
     fi
     
-    # 大前天
-    if echo "$content" | grep -qE "大前天"; then
-        date -d "3 days ago" +%Y-%m-%d
-        return
-    fi
-    
     # 今天/今儿
     if echo "$content" | grep -qE "今天|今日|今儿"; then
         echo "$today"
         return
     fi
     
-    # 具体日期格式
-    if echo "$content" | grep -qE "[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}"; then
-        echo "$content" | grep -oE "[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}" | head -1
-        return
-    fi
-    
-    # 匹配 X月X日 格式
-    if echo "$content" | grep -qE "[0-9]{1,2}月[0-9]{1,2}日"; then
-        local year=$(date +%Y)
-        local month=$(echo "$content" | grep -oE "[0-9]{1,2}月" | head -1 | grep -oE "[0-9]{1,2}")
-        local day=$(echo "$content" | grep -oE "[0-9]{1,2}日" | head -1 | grep -oE "[0-9]{1,2}")
-        echo "$year-$(printf "%02d" $month)-$(printf "%02d" $day)"
-        return
-    fi
-    
-    # 无法判断，返回空
-    echo ""
-}
-
-# 用 LLM 判断日期（当关键词无法判断时）
-decide_date_with_llm() {
-    local content="$1"
-    
-    # 调用 OpenRouter API (免费，支持中文)
-    local result=$(curl -s -X POST "https://openrouter.ai/api/v1/chat/completions" \
-        -H "Authorization: Bearer sk-or-v1-4e70e4a89b10a7bfdf4e39bf4e85bdfb6d8f2d8a4e5b8c9a6d3f5e7b9c2d1f5" \
-        -H "Content-Type: application/json" \
-        -H "HTTP-Referer: https://openclaw.ai" \
-        -d '{
-            "model": "google/gemma-3-1b-it:free",
-            "messages": [{"role": "system", "content": "你是日期判断专家。当前是2026年3月14日。根据用户输入判断是哪一天。只输出日期YYYY-MM-DD，不要其他。"}, {"role": "user", "content": "'"$content"'"}],
-            "max_tokens": 20
-        }')
-    
-    local decided_date=$(echo "$result" | grep -oE "[0-9]{4}-[0-9]{2}-[0-9]{2}" | head -1)
-    echo "$decided_date"
+    # 无法判断，返回今天
+    echo "$today"
 }
 
 # 主逻辑
 TODAY=$(date +%Y-%m-%d)
 
-# 先用简单关键词判断
-TARGET_DATE=$(parse_date_simple "$CONTENT")
-
-# 如果关键词无法判断，使用 LLM
-if [ -z "$TARGET_DATE" ]; then
-    echo "🔍 关键词无法判断，使用 LLM 智能分析..."
-    TARGET_DATE=$(decide_date_with_llm "$CONTENT")
-    
-    # 如果 LLM 也无法判断，默认今天
-    if [ -z "$TARGET_DATE" ]; then
-        echo "⚠️ 无法判断日期，默认今天"
-        TARGET_DATE="$TODAY"
-    fi
+# 如果传入了日期参数，直接使用
+if [ -n "$OPTIONAL_DATE" ]; then
+    TARGET_DATE="$OPTIONAL_DATE"
+    echo "📅 使用传入的日期: $TARGET_DATE"
+else
+    # 没有传入日期，使用 SubAgent 判断（这里保留接口，未来可以在这里调用 subagent）
+    # 目前先用备用方案
+    echo "🔍 使用默认日期判断..."
+    TARGET_DATE=$(parse_date_fallback "$CONTENT")
 fi
 
 # 判断是否为补录
