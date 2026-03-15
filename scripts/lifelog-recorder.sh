@@ -2,8 +2,23 @@
 # LifeLog Enhanced Recorder v3.0
 # 支持内容类型识别 + 生活/任务分离
 
-NOTION_KEY="ntn_u6470328110RTrO6nvdJt5D3YBVYRTkbukysWQUHBGd7JD"
-DATABASE_ID="30b181a95f2e80639966c2b9d93b69cb"
+# Notion 凭据 - 从环境变量读取
+NOTION_KEY="${NOTION_KEY:-}"
+DATABASE_ID="${NOTION_DATABASE_ID:-}"
+
+if [[ -z "$NOTION_KEY" ]]; then
+    echo "Error: NOTION_KEY environment variable not set" >&2
+    echo "Please set: export NOTION_KEY='your-notion-integration-token'" >&2
+    echo "And optionally: export NOTION_DATABASE_ID='your-database-id'" >&2
+    exit 1
+fi
+
+# 如果没有提供 DATABASE_ID，使用默认值（需要用户替换）
+if [[ -z "$DATABASE_ID" ]]; then
+    echo "Error: NOTION_DATABASE_ID environment variable not set" >&2
+    echo "Please set: export NOTION_DATABASE_ID='your-database-id'" >&2
+    exit 1
+fi
 API_VERSION="2022-06-28"
 SPEC_FILE="/root/.openclaw/workspace/docs/lifelog-spec.md"
 

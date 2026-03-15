@@ -3,8 +3,31 @@ name: lifelog
 description: |
   生活记录自动化系统。自动识别消息中的日期（今天/昨天/前天/具体日期），使用 SubAgent 智能判断，记录到 Notion 对应日期，支持补录标记。
   适用于：(1) 用户分享日常生活点滴时自动记录；(2) 定时自动汇总分析并填充情绪、事件、位置、人员字段
-version: 1.2.2
+version: 1.2.3
+credentials:
+  required:
+    - NOTION_KEY
+    - NOTION_DATABASE_ID
 ---
+
+# LifeLog 生活记录系统
+
+自动将用户的日常生活记录到 Notion，支持智能日期识别和自动汇总分析。
+
+## ⚠️ 必需凭据
+
+使用本技能前，必须设置以下环境变量：
+
+```bash
+export NOTION_KEY="your-notion-integration-token"
+export NOTION_DATABASE_ID="your-notion-database-id"
+```
+
+获取方式：
+1. 访问 https://www.notion.so/my-integrations 创建 Integration
+2. 获取 Internal Integration Token
+3. 创建 Database 并 Share 给 Integration
+4. 从 URL 中提取 Database ID
 
 # LifeLog 生活记录系统
 
@@ -83,7 +106,12 @@ bash lifelog-update.sh "<page_id>" "<情绪状态>" "<主要事件>" "<位置>" 
 1. 创建 Notion Integration 并获取 API Key
 2. 创建 Database 并共享给 Integration
 3. 获取 Database ID（URL 中提取）
-4. 修改脚本中的 `NOTION_KEY` 和 `DATABASE_ID`
+4. 设置环境变量：
+
+```bash
+export NOTION_KEY="your-notion-integration-token"
+export NOTION_DATABASE_ID="your-database-id"
+```
 
 ## 定时任务（可选）
 
