@@ -1,9 +1,9 @@
 ---
 name: lifelog
 description: |
-  生活记录自动化系统。自动识别消息中的日期（今天/昨天/前天/具体日期），使用 SubAgent 智能判断，记录到 Notion 对应日期，支持补录标记。
+  生活记录自动化系统。自动识别消息中的日期（今天/昨天/前天/具体日期），使用 SubAgent 智能判断，记录到 Notion 对应日期，每次都是**追加记录**而非覆盖。
   适用于：(1) 用户分享日常生活点滴时自动记录；(2) 定时自动汇总分析并填充情绪、事件、位置、人员字段
-version: 1.2.3
+version: 1.2.4
 credentials:
   required:
     - NOTION_KEY
@@ -37,7 +37,7 @@ export NOTION_DATABASE_ID="your-notion-database-id"
 
 1. **实时记录** - 用户分享生活点滴时自动记录到 Notion
 2. **智能日期识别（SubAgent）** - 使用 AI SubAgent 智能判断日期，优先分析文本中的日期关键词，其次分析上下文
-3. **补录标记** - 非当天记录的内容会标记为"🔁补录"
+3. **追加记录** - 每次都是追加到 Notion 指定日期的记录中，**绝不覆盖**
 4. **自动汇总** - 每天凌晨自动运行 LLM 分析，生成情绪状态、主要事件、位置、人员
 
 ## Notion 数据库要求
@@ -53,25 +53,37 @@ export NOTION_DATABASE_ID="your-notion-database-id"
 | 位置 | rich_text | 地点列表 |
 | 人员 | rich_text | 涉及的人员 |
 
-## 脚本说明
+## 记录流程
 
-### 1. lifelog-append.sh
+### 每条消息的处理步骤
 
-实时记录脚本，接收用户消息内容。**日期由 Agent 调用 SubAgent 智能判断**：
+1. 用户发送生活记录消息
+2. **立即调用 SubAgent 判断日期** - 分析消息中的日期关键词（今天/昨天/前天/具体日期）和上下文，输出判断的日期（YYYY-MM-DD）
+3. 调用 `lifelog-append.sh "消息内容" "判断的日期"` → 追加到 Notion 指定日期
+4. 如果指定日期已有记录，则**追加**内容到该日期的原文字段中
 
-```bash
-# 基本用法（Agent 会自动判断日期）
-bash lifelog-append.sh "今天早上吃了油条"
+### SubAgent 日期判断 Prompt
 
-# Agent 判断后传入日期
-bash lifelog-append.sh "前天去打球了" "2026-03-12"
+```
+分析以下用户消息，判断它描述的是哪个日期的生活记录。
+
+消息内容：「用户消息原文」
+
+请输出：
+1. 判断的日期（格式：YYYY-MM-DD）
+2. 判断依据（简单说明）
+
+只输出这两项，不要多余内容。
 ```
 
-**日期判断流程（Agent 侧）**：
-1. 用户发送生活记录 → Agent 调用 SubAgent 判断日期
-2. SubAgent 分析文本中的日期关键词（前天、昨天等）
-3. 如果没有明确日期，SubAgent 根据上下文智能判断
-4. Agent 将判断出的日期和内容一起传给脚本
+### 脚本用法
+
+```bash
+# 追加记录到指定日期（SubAgent 判断日期后调用）
+bash lifelog-append.sh "消息内容" "YYYY-MM-DD"
+```
+
+> 注意：脚本第二个参数为日期，不传则默认为今天。每条记录都是**追加**而非覆盖。
 
 ### 2. lifelog-daily-summary-v5.sh
 
@@ -131,6 +143,6 @@ openclaw cron add \
 
 ## 工作流
 
-1. 用户发送生活记录 → 调用 `lifelog-append.sh` → 写入 Notion
+1. 用户发送生活记录 → 调用 SubAgent 判断日期 → 调用 `lifelog-append.sh` → **追加**到 Notion
 2. 定时任务触发 → 调用 `lifelog-daily-summary-v5.sh` → 拉取原文
 3. LLM 分析原文 → 调用 `lifelog-update.sh` → 填充分析字段
